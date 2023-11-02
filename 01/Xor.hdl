@@ -11,5 +11,8 @@ CHIP Xor {
     OUT out;
 
     PARTS:
-    //// Replace this comment with your code.
+    // This uses 6 nands instead of 9 used in the demo.
+    Or(a=a, b=b, out=orAB);
+    Nand(a=a, b=b, out=nandAB);
+    And(a=orAB, b=nandAB, out=out);
 }
