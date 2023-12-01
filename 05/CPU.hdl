@@ -32,5 +32,65 @@ CHIP CPU {
         pc[15];          // Address of next instruction
 
     PARTS:
-    //// Replace this comment with your code.
+
+    // Is instruction A or C.
+    Mux16(a=instruction, b=aluOut, sel=instruction[15], out=instructionOut);
+
+    //A is loaded in all cases except for instruction C and NOT d2 (load A).. Hence using NAND for fast output.
+    Not(in=instruction[5], out=notSetA);
+    Nand(a=instruction[15],b=notSetA, out=loadA);
+
+    // It is also possible to use instruction A (NOT instruction[15]) or d2. That is when it's instruction A, or when d2 is loaded.
+    // This is slower since it uses 'Or' which uses 3 NANDS.
+    //  Not(in=instruction[15], out=instructA);
+    //  Or(a=instructA, b=instruction[5], out=loadA);
+
+    ARegister(in=instructionOut, load=loadA, out=aRegisterOut, out[0..14]=addressM);
+
+    Mux16(a=aRegisterOut, b=inM, sel=instruction[12], out=aOrM);
+
+    // Instruction 4 should also depend on if instruction 15 is 1
+    And(a=instruction[15], b=instruction[4], out=loadD);
+    DRegister(in=aluOut, load=loadD, out=dRegisterOut);
+
+    ALU(
+        x=dRegisterOut, 
+        y=aOrM, 
+        zx=instruction[11], 
+        nx=instruction[10], 
+        zy=instruction[9], 
+        ny=instruction[8], 
+        f=instruction[7], 
+        no=instruction[6], 
+        out=outM, 
+        out=aluOut, 
+        zr=zr, 
+        ng=ng
+    );
+
+    And(a=instruction[15], b=instruction[3], out=writeM);
+
+    // when J1, then jump will occur if ng is set.
+    And(a=instruction[2], b=ng, out=jump1);
+
+    // when J2, then jump will occur if zr
+    And(a=instruction[1], b=zr, out=jump2);
+
+    Or(a=zr, b=ng, out=zrNg);
+    Not(in=zrNg, out=neitherZrNorNg);
+
+    // when J3, jump will occur if neither zr nor ng
+    And(a=instruction[0], b=neitherZrNorNg, out=jump3);
+
+    Or(a=jump1, b=jump2, out=jump1or2);
+    Or(a=jump1or2, b=jump3, out=jump);
+
+    And(a=jump, b=instruction[15], out=load);
+
+    // increment to true means it will always occur in as much as jump doesn't occur.
+    // already specified in ALU to only increment when neither reset nor load.
+    // Save the stress of extra - Not(in=load, out=inc);
+
+    PC(in=aRegisterOut, load=load, inc=true, reset=reset, out[0..14]=pc);
+
 }
